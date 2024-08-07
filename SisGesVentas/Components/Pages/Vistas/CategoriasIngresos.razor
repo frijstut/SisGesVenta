@@ -1,0 +1,136 @@
+﻿@page "/CategoriasIngresos"
+@using SisGesVentas.Components.Pages.httpViews
+@using SisGesVentas.Shared.Model
+@using System.Text.Json
+
+@inject HttpClient Http
+
+<Encabezado />
+<main id="main" class="main">
+    <div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Categoria ID</th>
+                    <th>Nombre</th>
+                    <th>Descripcion</th>
+                    <th>Seleccionar</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var categoria in categorias)
+                {
+                    <tr>
+                        <td>@categoria.CategoriaId</td>
+                        <td>@categoria.CategoriaNombre</td>
+                        <td>@categoria.CategoriaDescripcion</td>
+                        <td>
+                            <button class="btn btn-outline-secondary" @onclick="() => SeleccionarCategoria(categoria)">Seleccionar</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <hr />
+        <EditForm Model="categoria" OnValidSubmit="@Guardar" FormName="categoriaInicio">
+            <div class="mb-3">
+                <label for="CategoriaId">ID</label>
+                <InputNumber id="CategoriaId" @bind-Value="categoria.CategoriaId" class="form-control" disabled />
+            </div>
+            <div class="mb-3">
+                <label for="CategoriaNombre">Nombre</label>
+                <InputText id="CategoriaNombre" @bind-Value="categoria.CategoriaNombre" class="form-control" />
+            </div>
+            <div class="mb-3">
+                <label for="CategoriaDescripcion">Descripcion</label>
+                <InputText id="CategoriaDescripcion" @bind-Value="categoria.CategoriaDescripcion" class="form-control" />
+            </div>
+            <button type="submit" class="btn btn-outline-success">Guardar</button>
+        </EditForm>
+        <div class="mt-3">
+            <p>@Respuesta</p>
+        </div>
+    </div>
+</main>
+
+<Footer />
+
+@code {
+    Categoria categoria = new Categoria();
+    List<Categoria> categorias = new List<Categoria>();
+    string Respuesta = "En proceso...";
+    Dictionary<string, List<string>> validationErrors = new Dictionary<string, List<string>>();
+
+    public string rutaApiRest = "https://localhost:44303/api/";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarCategorias();
+    }
+
+    async Task CargarCategorias()
+    {
+        try
+        {
+            categorias = await Http.GetFromJsonAsync<List<Categoria>>(rutaApiRest + "Categoria/Listado");
+        }
+        catch (Exception ex)
+        {
+            Respuesta = $"Error cargando categorías: {ex.Message}";
+        }
+    }
+
+    void SeleccionarCategoria(Categoria categoriaSeleccionada)
+    {
+        categoria = new Categoria
+            {
+                CategoriaId = categoriaSeleccionada.CategoriaId,
+                CategoriaNombre = categoriaSeleccionada.CategoriaNombre,
+                CategoriaDescripcion = categoriaSeleccionada.CategoriaDescripcion
+            };
+    }
+
+    async Task Guardar()
+    {
+        Respuesta = "Guardando...";
+        validationErrors.Clear();
+
+        try
+        {
+            HttpResponseMessage respuestajson;
+            if (categoria.CategoriaId == 0)
+            {
+                respuestajson = await Http.PostAsJsonAsync(rutaApiRest + "Categoria/Crear", categoria);
+            }
+            else
+            {
+                respuestajson = await Http.PutAsJsonAsync(rutaApiRest + "Categoria/Actualizar", categoria);
+            }
+
+            if (respuestajson.IsSuccessStatusCode)
+            {
+                Respuesta = "Categoría guardada con éxito.";
+                categoria = new Categoria(); // Clear the form after saving
+                await CargarCategorias();
+            }
+            else
+            {
+                var content = await respuestajson.Content.ReadAsStringAsync();
+                Respuesta = "Error guardando categoría.";
+                if (respuestajson.StatusCode == System.Net.HttpStatusCode.BadRequest)
+                {
+                    var errors = JsonDocument.Parse(content).RootElement.GetProperty("errors");
+                    foreach (var error in errors.EnumerateObject())
+                    {
+                        validationErrors[error.Name] = error.Value.EnumerateArray().Select(x => x.GetString()).ToList();
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Respuesta = $"Error guardando categoría: {ex.Message}";
+        }
+    }
+}

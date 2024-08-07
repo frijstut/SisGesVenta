@@ -1,0 +1,159 @@
+﻿@page "/ProveedoresIngresos"
+
+@using System.Text.Json
+@inject HttpClient Http
+
+@using SisGesVentas.Components.Pages.httpViews
+@using SisGesVentas.Shared.Model
+
+<Encabezado />
+
+<main id="main" class="main">
+    <div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Proveedor ID</th>
+                    <th>Nombre</th>
+                    <th>Direccion</th>
+                    <th>Telefono</th>
+                    <th>Email</th>
+                    <th>Contacto</th>
+                    <th>Seleccionar</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var proveedor in proveedores)
+                {
+                    <tr>
+                        <td>@proveedor.ProveedorId</td>
+                        <td>@proveedor.ProveedorNombre</td>
+                        <td>@proveedor.ProveedorDireccion</td>
+                        <td>@proveedor.ProveedorTelefono</td>
+                        <td>@proveedor.ProveedorEmail</td>
+                        <td>@proveedor.ProveedorContacto</td>
+                        <td>
+                            <button class="btn btn-outline-secondary" @onclick="() => SeleccionarProveedor(proveedor)">Seleccionar</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <hr />
+        <EditForm Model="proveedor" OnValidSubmit="@GuardarProveedor" FormName="proveedorInicio">
+            <div class="mb-3">
+                <label for="ProveedorId">ID</label>
+                <InputNumber id="ProveedorId" @bind-Value="proveedor.ProveedorId" class="form-control" disabled />
+            </div>
+            <div class="mb-3">
+                <label for="ProveedorNombre">Nombre</label>
+                <InputText id="ProveedorNombre" @bind-Value="proveedor.ProveedorNombre" class="form-control" />
+            </div>
+            <div class="mb-3">
+                <label for="ProveedorDireccion">Descripcion</label>
+                <InputText id="ProveedorDireccion" @bind-Value="proveedor.ProveedorDireccion" class="form-control" />
+            </div>
+            <div class="mb-3">
+                <label for="ProveedorTelefono">ID</label>
+                <InputNumber id="ProveedorTelefono" @bind-Value="proveedor.ProveedorTelefono" class="form-control" disabled />
+            </div>
+            <div class="mb-3">
+                <label for="ProveedorEmail">Nombre</label>
+                <InputText id="ProveedorEmail" @bind-Value="proveedor.ProveedorEmail" class="form-control" />
+            </div>
+            <div class="mb-3">
+                <label for="ProveedorContacto">Descripcion</label>
+                <InputText id="ProveedorContacto" @bind-Value="proveedor.ProveedorContacto" class="form-control" />
+            </div>
+            <button type="submit" class="btn btn-outline-success">Guardar</button>
+        </EditForm>
+        <div class="mt-3">
+            <p>@Respuesta</p>
+        </div>
+    </div>
+</main>
+<Footer />
+
+
+@code {
+    Proveedor proveedor = new Proveedor();
+    List<Proveedor> proveedores = new List<Proveedor>();
+    string Respuesta = "En proceso...";
+    Dictionary<string, List<string>> validationErrors = new Dictionary<string, List<string>>();
+
+    public string rutaApiRest = "https://localhost:44303/api/";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarProveedores();
+    }
+
+    async Task CargarProveedores()
+    {
+        try
+        {
+            proveedores = await Http.GetFromJsonAsync<List<Proveedor>>(rutaApiRest + "Proveedor/Listado");
+        }
+        catch (Exception ex)
+        {
+            Respuesta = $"Error cargando categorías: {ex.Message}";
+        }
+    }
+
+    void SeleccionarProveedor(Proveedor proveedorSeleccionado)
+    {
+        proveedor = new Proveedor();
+        {
+            proveedor.ProveedorId = proveedorSeleccionado.ProveedorId;
+            proveedor.ProveedorNombre = proveedorSeleccionado.ProveedorNombre;
+            proveedor.ProveedorDireccion = proveedorSeleccionado.ProveedorDireccion;
+            proveedor.ProveedorTelefono = proveedorSeleccionado.ProveedorTelefono;
+            proveedor.ProveedorEmail = proveedorSeleccionado.ProveedorEmail;
+            proveedor.ProveedorContacto = proveedorSeleccionado.ProveedorContacto;
+        };
+    }
+
+    async Task GuardarProveedor()
+    {
+        Respuesta = "Guardando...";
+        validationErrors.Clear();
+
+        try
+        {
+            HttpResponseMessage respuestajson;
+            if (proveedor.ProveedorId == 0)
+            {
+                respuestajson = await Http.PostAsJsonAsync(rutaApiRest + "Proveedor/Crear", proveedor);
+            }
+            else
+            {
+                respuestajson = await Http.PutAsJsonAsync(rutaApiRest + "Proveedor/Actualizar", proveedor);
+            }
+
+            if (respuestajson.IsSuccessStatusCode)
+            {
+                Respuesta = "Categoría guardada con éxito.";
+                proveedor = new Proveedor(); // Clear the form after saving
+                await CargarProveedores();
+            }
+            else
+            {
+                var content = await respuestajson.Content.ReadAsStringAsync();
+                Respuesta = "Error guardando categoría.";
+                if (respuestajson.StatusCode == System.Net.HttpStatusCode.BadRequest)
+                {
+                    var errors = JsonDocument.Parse(content).RootElement.GetProperty("errors");
+                    foreach (var error in errors.EnumerateObject())
+                    {
+                        validationErrors[error.Name] = error.Value.EnumerateArray().Select(x => x.GetString()).ToList();
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Respuesta = $"Error guardando categoría: {ex.Message}";
+        }
+    }
+}

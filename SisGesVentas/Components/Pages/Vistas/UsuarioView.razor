@@ -1,0 +1,128 @@
+﻿@page "/UsuarioView"
+
+@inject HttpClient Http
+
+@using SisGesVentas.Components.Pages.httpViews
+@using SisGesVentas.Shared
+@using SisGesVentas.Shared.Model
+
+<Encabezado />
+<Sidebar />
+<main id="main" class="main">
+
+    <div class="pagetitle">
+        <h1>Dashboard</h1>
+        <nav>
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Home</a></li>
+                <li class="breadcrumb-item active">Usuario - Listado</li>
+            </ol>
+        </nav>
+    </div><!-- End Page Title -->
+
+    <section class="section dashboard">
+        <div>
+            <h3>Ingresar datos Estudiante</h3>
+        </div>
+        <div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Usuario ID</th>
+                        <th>Nombre</th>
+                        <th>Correo</th>
+                        <th>Seleccionar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var usuario in Usuarios)
+                    {
+                        <tr>
+                            <td>@usuario.UsuarioId</td>
+                            <td>@usuario.UsuarioNombre</td>
+                            <td>@usuario.UsuarioUser</td>
+                            <td>@usuario.UsuarioPassword</td>
+                            <td>
+                                <button class="btn btn-outline-secondary">Seleccionar</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <hr />
+            <EditForm Model="usuario" method="post" OnValidSubmit="@Guardar" FormName="usuariocrea">
+                <div class="mb-3">
+                    <label for="UsuarioId">ID</label>
+                    <input id="UsuarioId" type="text" @bind-value="usuario.UsuarioId" class="form-control" disabled />
+                </div>
+                <div class="mb-3">
+                    <label for="UsuarioNombre">Nombre</label>
+                    <input id="UsuarioNombre" type="text" @bind-value="usuario.UsuarioNombre" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="UsuarioCorreo">Correo</label>
+                    <input id="UsuarioCorreo" type="email" @bind-value="usuario.UsuarioUser" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="UsuarioPassWord">Password</label>
+                    <input id="UsuarioPassWord" type="password" @bind-value="usuario.UsuarioPassword" class="form-control" />
+                </div>
+                <button type="submit" class="btn btn-outline-success">Guardar</button>
+            </EditForm>
+            <div class="mt-3">
+                <p>@Respuesta</p>
+            </div>
+        </div>
+    </section>
+</main>
+<Footer />
+
+@code {
+    Usuario usuario = new Usuario();
+    public static List<Usuario> Usuarios = new List<Usuario>();
+    string Respuesta = "En proceso...";
+
+    public string rutaApiRest = "https://localhost:44303/api/";
+
+    async Task Guardar()
+    {
+        Console.WriteLine(Respuesta + " Creando/Actualizando Usuario 1");
+        if (usuario.UsuarioId == 0)
+        {
+            var respuestajson = await Http.PostAsJsonAsync(rutaApiRest + "Usuario/Crear", usuario);
+            Console.WriteLine(Respuesta + " Obteniendo Respuesta");
+            Respuesta = await respuestajson.Content.ReadAsStringAsync();
+        }
+        else
+        {
+            var respuestajson = await Http.PutAsJsonAsync(rutaApiRest + "Usuario/Actualizar", usuario);
+            Respuesta = await respuestajson.Content.ReadAsStringAsync();
+        }
+        Console.WriteLine(Respuesta + " Creando/Actualizando Usuario");
+        await ObtenerUsuarios();
+    }
+
+    async Task ObtenerUsuarios()
+    {
+        try
+        {
+            var respuestaUsuarios = await Http.GetFromJsonAsync<List<Usuario>>(rutaApiRest + "Usuario/Listado");
+            Usuarios = respuestaUsuarios;
+        }
+        catch (Exception ex)
+        {
+            Respuesta = $"Error obteniendo usuarios: {ex.Message} + Creando Listado de usuario";
+        }
+    }
+
+    async Task AsignarUsuarios(Usuario objeto)
+    {
+        usuario = objeto;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ObtenerUsuarios();
+    }
+}
